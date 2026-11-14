@@ -34,22 +34,11 @@ Copy `.env.example` to `.env.local` only when a future local service needs confi
 4. **Engine integrations:** implement and validate each defensive engine separately, with provenance, limits and human review.
 5. **Operational readiness:** security review, accessibility checks, monitoring, deployment configuration and documented incident response.
 
-These are planning notes, not promises that live analysis is available. No deployment or publishing is configured by this preview.
+These are planning notes, not promises that live analysis is available. The GitHub Pages workflow publishes only this static frontend preview; it does not connect backend analysis services.
 
 ## GitHub
 
-This folder is not connected to a Git repository yet. To connect it later, create a GitHub repository named `OBSCURA`, then run these commands from this folder using the repository URL GitHub gives you:
-
-```sh
-git init
-git add .
-git commit -m "Build OBSCURA Phase 1 preview"
-git branch -M main
-git remote add origin <your-repository-url>
-git push -u origin main
-```
-
-Review `.gitignore` before committing. It excludes dependencies, build output, environment files and TypeScript build metadata. This project has not been pushed or deployed.
+The project source is in the public `kevinantonakhil-coder/OBSCURA` repository. The `main` branch includes a GitHub Actions Pages workflow. After adding that workflow, set **Settings → Pages → Build and deployment → Source** to **GitHub Actions** and push changes to `main` to trigger a deployment. Review `.gitignore` before committing; it excludes dependencies, build output, environment files and TypeScript build metadata.
 
 ## Stack
 
