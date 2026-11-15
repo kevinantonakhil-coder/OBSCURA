@@ -2,7 +2,7 @@
 
 **SEE BEYOND THE SURFACE.**
 
-Phase 1 is a responsive React and TypeScript frontend preview for OBSCURA. It includes a public landing page and a separate Intelligence Console shell. Every case, chart and finding shown in the console is fictional demo content. The engine screens are workflow previews: no backend analysis, upload, URL visit, external lookup or attachment execution is performed.
+The project is a responsive React and TypeScript browser-local demonstration of the OBSCURA workflows through Phase 10. It includes the public landing page and a separate Intelligence Console. Cases and saved findings persist in this browser's local storage. All bundled records and connector responses are synthetic demo data.
 
 ## Local setup
 
@@ -15,30 +15,39 @@ npm run dev
 
 Vite prints a local address to open in your browser. To create a production build locally, run `npm run build`, then `npm run preview` to view that build.
 
-Copy `.env.example` to `.env.local` only when a future local service needs configuration. Phase 1 does not need environment variables or credentials. Do not put secrets in frontend variables: values prefixed with `VITE_` are exposed to browser users.
+The demo does not need environment variables, credentials, or API keys. Do not put secrets in frontend variables: values prefixed with `VITE_` are exposed to browser users.
 
-## Phase 1 includes
+## Working demo workflows
 
-- Public OBSCURA product landing page and responsive Intelligence Console.
-- Overview dashboard with illustrative metrics, SVG signal chart, engine status and expandable activity rows.
-- MIRAGE media review workflow; GHOST defensive domain and message workflow; PHANTOM public impersonation-signal review without face-based identity identification; QUANTUM local hash and educational proof workflow.
-- Investigation list and search, evidence vault, case files, report templates and settings shell.
-- Keyboard focus treatment, semantic controls, reduced-motion support and narrow-screen layouts.
-- Clear simulated-data labels. No analysis service or persistence backend is connected.
+- Create, search, open, update, and delete local demo cases. Add review notes and inspect saved findings and evidence summaries.
+- **GHOST (Phase 9 demo):** deterministic text-only checks for domain strings and sanitized email headers. No DNS, registration, reputation, URL, or mailbox lookups.
+- **MIRAGE (Phase 10 demo):** locally inspect PNG/JPEG signatures and bounded header metadata, calculate SHA-256 for files up to 25 MB, and save a review summary. No image bytes are uploaded or saved; metadata and a digest cannot establish authenticity.
+- Export case summaries, evidence registers, or a browser-state backup as JSON.
+- Review Phase 7 data-handling rules, inspect the audit list, and run Phase 8 connector fixtures. Fixture toggles never contact external sources.
+- Choose an Analyst, Reviewer, or Workspace admin demo role. The role preview changes interface permissions only; it does not secure stored data.
+- Responsive landing and console layouts, visible keyboard focus, and reduced-motion support.
+
+## Demo boundaries
+
+- This is not a production SOC or a live threat-intelligence service. GHOST and MIRAGE use local rules only; no AI API, external feed, DNS lookup, URL visit, attachment execution, or backend request is made.
+- Browser local storage is not encrypted, is device/browser-specific, and is not appropriate for real incidents, personal data, secrets, or confidential evidence. Use synthetic inputs only.
+- Phase 4 Firebase Authentication is not connected because this repository has no Firebase project configuration. The sign-in page is a demo role picker, not account authentication.
+- Phase 5 authorization is a role-based UI demonstration. Real permission enforcement requires a protected backend and server-side rules.
+- Phase 6 server persistence, backups, and recovery drills are not implemented. Downloaded JSON is a user-created demo export, not a managed backup service.
+- Phase 8 connector examples are bundled fixtures and may not reflect current threat information.
+- PHANTOM and QUANTUM are roadmap previews beyond this Phase 10 demo; neither engine performs analysis.
 
 ## Planned phases
 
-1. **Frontend preview (current):** establish visual identity, public site, console navigation and safe demo workflows.
-2. **Product design and threat model:** define users, authorization, retention, evidence handling, abuse controls and review requirements before connecting sensitive workflows.
-3. **Backend foundation:** authentication, authorization, case/evidence persistence, audit history and secure file handling.
-4. **Engine integrations:** implement and validate each defensive engine separately, with provenance, limits and human review.
-5. **Operational readiness:** security review, accessibility checks, monitoring, deployment configuration and documented incident response.
+See the [20-phase product roadmap](docs/roadmap/phase-1-to-20.md). Phase 2 product and safety requirements are a complete working draft pending review. Phase 3 architecture remains a proposal; Firebase is the selected Phase 4 authentication direction, but no project is connected. Later roadmap phases describe proposed milestones, not live capabilities or launch promises. GitHub Pages publishes a static frontend only.
 
-These are planning notes, not promises that live analysis is available. The GitHub Pages workflow publishes only this static frontend preview; it does not connect backend analysis services.
+Phase 2 product and safety requirements: [docs/product/phase-2-product-and-safety-requirements.md](docs/product/phase-2-product-and-safety-requirements.md).
+
+Phase 3 proposed architecture and threat model: [docs/architecture/phase-3-system-architecture-and-threat-model.md](docs/architecture/phase-3-system-architecture-and-threat-model.md).
 
 ## GitHub
 
-The project source is in the public `kevinantonakhil-coder/OBSCURA` repository. The `main` branch includes a GitHub Actions Pages workflow. After adding that workflow, set **Settings → Pages → Build and deployment → Source** to **GitHub Actions** and push changes to `main` to trigger a deployment. Review `.gitignore` before committing; it excludes dependencies, build output, environment files and TypeScript build metadata.
+The project source is in the public `kevinantonakhil-coder/OBSCURA` repository. Its GitHub Actions Pages workflow builds on pushes to `main`. These local changes are not published automatically; publish only after reviewing and pushing them. `.gitignore` excludes dependencies, build output, environment files and TypeScript build metadata.
 
 ## Stack
 
