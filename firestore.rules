@@ -11,16 +11,8 @@ service cloud.firestore {
     function role(workspaceId) {
       return get(/databases/$(database)/documents/workspaces/$(workspaceId)/members/$(request.auth.uid)).data.role;
     }
-    // A role lookup already proves that the membership document exists. Avoid
-    // checking exists() and then get() for the same member on every write: the
-    // redundant expression tree can exceed Firestore's rules evaluation limit
-    // for batched case + activity writes.
-    function isAdmin(workspaceId) {
-      return signedIn() && allowlisted(request.auth.uid) && role(workspaceId) in ['owner', 'admin'];
-    }
-    function canAnalyze(workspaceId) {
-      return signedIn() && allowlisted(request.auth.uid) && role(workspaceId) in ['owner', 'admin', 'analyst'];
-    }
+    function isAdmin(workspaceId) { return isMember(workspaceId) && role(workspaceId) in ['owner', 'admin']; }
+    function canAnalyze(workspaceId) { return isMember(workspaceId) && role(workspaceId) in ['owner', 'admin', 'analyst']; }
     function validWorkspace(data) {
       return data.keys().hasAll(['name','purpose','ownerUid','createdAt','updatedAt','schemaVersion'])
         && data.keys().hasOnly(['name','purpose','ownerUid','createdAt','updatedAt','schemaVersion'])
@@ -90,9 +82,10 @@ service cloud.firestore {
       return (data.action == 'WORKSPACE_CREATED' && data.targetId == workspaceId && allowlisted(request.auth.uid)
           && !exists(/databases/$(database)/documents/workspaces/$(workspaceId))
           && getAfter(/databases/$(database)/documents/workspaces/$(workspaceId)).data.ownerUid == request.auth.uid
-          && getAfter(/databases/$(database)/documents/workspaces/$(workspaceId)/members/$(request.auth.uid)).data.role == 'owner')
+          && existsAfter(/databases/$(database)/documents/workspaces/$(workspaceId)/members/$(request.auth.uid)))
         || (data.action == 'CASE_CREATED' && canAnalyze(workspaceId)
           && !exists(/databases/$(database)/documents/workspaces/$(workspaceId)/cases/$(data.targetId))
+          && existsAfter(/databases/$(database)/documents/workspaces/$(workspaceId)/cases/$(data.targetId))
           && getAfter(/databases/$(database)/documents/workspaces/$(workspaceId)/cases/$(data.targetId)).data.createdBy == request.auth.uid)
         || (data.action == 'CASE_UPDATED' && canAnalyze(workspaceId)
           && exists(/databases/$(database)/documents/workspaces/$(workspaceId)/cases/$(data.targetId))
@@ -100,15 +93,19 @@ service cloud.firestore {
             > get(/databases/$(database)/documents/workspaces/$(workspaceId)/cases/$(data.targetId)).data.updatedAt)
         || (data.action == 'CASE_NOTE_ADDED' && canAnalyze(workspaceId)
           && !exists(/databases/$(database)/documents/workspaces/$(workspaceId)/cases/$(data.targetId)/notes/$(data.noteId))
+          && existsAfter(/databases/$(database)/documents/workspaces/$(workspaceId)/cases/$(data.targetId)/notes/$(data.noteId))
           && getAfter(/databases/$(database)/documents/workspaces/$(workspaceId)/cases/$(data.targetId)/notes/$(data.noteId)).data.authorUid == request.auth.uid)
         || (data.action == 'FINDING_SAVED' && canAnalyze(workspaceId)
           && exists(/databases/$(database)/documents/workspaces/$(workspaceId)/cases/$(data.targetId))
+          && existsAfter(/databases/$(database)/documents/workspaces/$(workspaceId)/cases/$(data.targetId))
           && !exists(/databases/$(database)/documents/workspaces/$(workspaceId)/cases/$(data.targetId)/findings/$(data.findingId))
+          && existsAfter(/databases/$(database)/documents/workspaces/$(workspaceId)/cases/$(data.targetId)/findings/$(data.findingId))
           && getAfter(/databases/$(database)/documents/workspaces/$(workspaceId)/cases/$(data.targetId)/findings/$(data.findingId)).data.createdBy == request.auth.uid
           && getAfter(/databases/$(database)/documents/workspaces/$(workspaceId)/cases/$(data.targetId)).data.updatedAt
             > get(/databases/$(database)/documents/workspaces/$(workspaceId)/cases/$(data.targetId)).data.updatedAt)
         || (data.action == 'MEMBER_ADDED' && isAdmin(workspaceId)
           && !exists(/databases/$(database)/documents/workspaces/$(workspaceId)/members/$(data.targetId))
+          && existsAfter(/databases/$(database)/documents/workspaces/$(workspaceId)/members/$(data.targetId))
           && getAfter(/databases/$(database)/documents/workspaces/$(workspaceId)/members/$(data.targetId)).data.invitedBy == request.auth.uid)
         || (data.action == 'MEMBER_REMOVED' && isAdmin(workspaceId)
           && exists(/databases/$(database)/documents/workspaces/$(workspaceId)/members/$(data.targetId))

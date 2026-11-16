@@ -24,11 +24,15 @@ if (existsSync(cacheRoot)) {
 }
 
 const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm'
+// These emulator suites share a project and each clears its Firestore data.
+// Run files serially so one suite cannot erase another suite's fixtures.
 // The Firebase CLI passes this value to a shell on Linux; literal quote
 // characters become part of the command name and cause a CI exit 127.
-const emulatorTestCommand = process.platform === 'win32' ? '"npm test -- tests/firebase"' : 'npm test -- tests/firebase'
+const emulatorTestCommand = process.platform === 'win32'
+  ? '"npm test -- --no-file-parallelism tests/firebase"'
+  : 'npm test -- --no-file-parallelism tests/firebase'
 const command = firebaseEntry
-  ? { executable: process.execPath, args: [firebaseEntry, 'emulators:exec', '--project', 'demo-obscura', '--only', 'auth,firestore', 'npm test -- tests/firebase'], shell: false }
+  ? { executable: process.execPath, args: [firebaseEntry, 'emulators:exec', '--project', 'demo-obscura', '--only', 'auth,firestore', emulatorTestCommand], shell: false }
   : { executable: npmCommand, args: ['exec', '--yes', '--legacy-peer-deps', '--cache', '.npm-cache', '--package=firebase-tools@15.36.0', '--', 'firebase', 'emulators:exec', '--project', 'demo-obscura', '--only', 'auth,firestore', emulatorTestCommand], shell: process.platform === 'win32' }
 
 const child = spawn(command.executable, command.args, { env, stdio: 'inherit', shell: command.shell })
