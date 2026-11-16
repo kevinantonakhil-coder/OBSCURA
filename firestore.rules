@@ -11,8 +11,16 @@ service cloud.firestore {
     function role(workspaceId) {
       return get(/databases/$(database)/documents/workspaces/$(workspaceId)/members/$(request.auth.uid)).data.role;
     }
-    function isAdmin(workspaceId) { return isMember(workspaceId) && role(workspaceId) in ['owner', 'admin']; }
-    function canAnalyze(workspaceId) { return isMember(workspaceId) && role(workspaceId) in ['owner', 'admin', 'analyst']; }
+    // A role lookup already proves that the membership document exists. Avoid
+    // checking exists() and then get() for the same member on every write: the
+    // redundant expression tree can exceed Firestore's rules evaluation limit
+    // for batched case + activity writes.
+    function isAdmin(workspaceId) {
+      return signedIn() && allowlisted(request.auth.uid) && role(workspaceId) in ['owner', 'admin'];
+    }
+    function canAnalyze(workspaceId) {
+      return signedIn() && allowlisted(request.auth.uid) && role(workspaceId) in ['owner', 'admin', 'analyst'];
+    }
     function validWorkspace(data) {
       return data.keys().hasAll(['name','purpose','ownerUid','createdAt','updatedAt','schemaVersion'])
         && data.keys().hasOnly(['name','purpose','ownerUid','createdAt','updatedAt','schemaVersion'])
