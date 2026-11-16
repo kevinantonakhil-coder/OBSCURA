@@ -1,18 +1,21 @@
 # OBSCURA — 20-Phase Product Roadmap
 
-**Status:** Working roadmap · **Last updated:** 2026-11-14
+**Status:** Working roadmap · **Last updated:** 2026-11-15
 
 Each phase should produce a reviewable milestone. A phase does not mean live analysis exists until its backend, data source, security controls, and evaluation have been implemented and approved for use.
 
 ## Current progress
 
-- **Phase 1:** The published GitHub Pages site is still the earlier static preview. The local source now contains an expanded browser-local demo through Phase 10; these latest changes have not been published.
-- **Phase 2:** Product and safety requirements are a complete working draft, pending user review and approval.
-- **Phase 3:** The architecture and threat model remain a proposal and have not been approved as the implementation design.
-- **Phase 4:** Firebase Authentication is the selected direction, but no Firebase project or authentication flow is connected. The current sign-in screen only switches local demo roles.
-- **Phases 5–8:** The site demonstrates role-based interface states, browser-local case persistence, governance guidance, and bundled connector fixtures. It does not implement server authorization, a backend, governed live intake, or external connectors.
-- **Phases 9–10:** GHOST text checks and MIRAGE PNG/JPEG header and SHA-256 checks run locally in the browser. These are deterministic demonstrations, not live threat intelligence or authenticity verdicts.
-- **Phase 5 gate:** Authorization remains separate from sign-in. A Firebase-authenticated identity must not receive case or workspace access until server-side authorization is designed and enforced.
+- **Phase 1:** The local source has a responsive landing page and separate console; latest changes remain unpublished. GitHub Pages still serves the earlier commit.
+- **Phase 2:** Product/safety requirements are approved for a synthetic Firebase pilot. Real evidence remains out of scope pending a data policy.
+- **Phase 3:** Firebase Auth and Firestore Standard design is approved. The architecture and threat model document its limits and deployment gates.
+- **Phase 4:** Google Auth, signed-in state, operator UID allowlist lookup, sign-out and access-denied UI are implemented. No Firebase project is connected yet.
+- **Phase 5:** Firestore Rules and adversarial emulator tests are written. GitHub Actions now provisions Java 21 and gates Pages publication on emulator results; those hosted checks still need to run.
+- **Phase 6:** Firebase workspace/case/member/activity repository, JSON export/restore, and console screens are implemented. Emulator verification and managed backup/recovery remain outstanding.
+- **Phase 7:** Synthetic-only handling guidance and UI are implemented. Retention/deletion and production data policy remain unapproved.
+- **Phase 8:** Connector contracts are fixture-only; no live source or external request is enabled.
+- **Phases 9–10:** GHOST, MIRAGE, PHANTOM and QUANTUM local demonstrations are implemented. They are deterministic/educational browser workflows, not live threat intelligence, identity findings, or production cryptographic proof services.
+- **Release gate:** No Firebase project creation, cloud rules deployment, GitHub push, or Pages publication has been done. The hosted Java 21 emulator check must pass before the existing Pages deployment job can publish. A local Java install is optional.
 
 | Phase | Work | Milestone |
 |---|---|---|
@@ -21,7 +24,7 @@ Each phase should produce a reviewable milestone. A phase does not mean live ana
 | 3. System architecture and threat model | Select trust boundaries, data flows, isolation controls, threats, and pre-production gates | [Architecture and threat model](../architecture/phase-3-system-architecture-and-threat-model.md) |
 | 4. Authentication | Integrate Firebase Authentication; choose sign-in method and define MFA, session, account recovery, account disablement, and authorized domains | Firebase-backed sign-in and account lifecycle work; no case access is granted by authentication alone |
 | 5. Authorization | Define and enforce workspace membership, roles, object ownership, and deny-by-default resource access | Independently checked permissions, with tests for allowed and denied access |
-| 6. Backend, cases, and recovery foundation | API, PostgreSQL schema, migrations, case lifecycle, audit events, backups, and a restore rehearsal using disposable data | A small persistent case service with a demonstrated recovery path |
+| 6. Firebase cases and recovery foundation | Firestore Standard schema, strict Rules, case lifecycle, append-only activity, versioned JSON export/restore, and an emulator restore rehearsal | A small persistent synthetic case workspace; managed backup is a later, separately reviewed service |
 | 7. Data governance and evidence policy | Approve data inventory, source permissions/licenses, labels, provenance, privacy, retention, deletion, and allowed evidence types | Signed-off rules before external data collection or evidence ingestion |
 | 8. Controlled connectors | Build connector contracts only for Phase 7-approved sources; add attribution, terms, normalization, deduplication, freshness, and rate limits | Safe, attributed ingestion from approved sources |
 | 9. GHOST | Defensive domain and sanitized email-header checks with deterministic rules and approved sources | Demo: local text rules with explicit unknown/unavailable states; live source connectors remain future work |

@@ -11,7 +11,7 @@ export type CheckResult = {
 
 export type Finding = {
   id: string
-  engine: 'GHOST' | 'MIRAGE'
+  engine: 'GHOST' | 'MIRAGE' | 'PHANTOM' | 'QUANTUM'
   title: string
   createdAt: string
   priority: 'HIGH' | 'REVIEW' | 'INFO'
@@ -123,12 +123,12 @@ export function parseDemoBackup(serialized: string): DemoState {
   const candidate = value as Partial<DemoState>
   const allowedRoles: Role[] = ['Analyst', 'Reviewer', 'Workspace admin']
   const validCheck = (item: unknown): item is CheckResult => !!item && typeof item === 'object' && typeof (item as CheckResult).id === 'string' && typeof (item as CheckResult).title === 'string' && ['PASS', 'SIGNAL', 'UNKNOWN', 'UNAVAILABLE'].includes((item as CheckResult).state) && typeof (item as CheckResult).detail === 'string' && typeof (item as CheckResult).source === 'string'
-  const validFinding = (item: unknown): item is Finding => !!item && typeof item === 'object' && ['GHOST', 'MIRAGE'].includes((item as Finding).engine) && typeof (item as Finding).id === 'string' && typeof (item as Finding).title === 'string' && typeof (item as Finding).createdAt === 'string' && ['HIGH', 'REVIEW', 'INFO'].includes((item as Finding).priority) && typeof (item as Finding).summary === 'string' && typeof (item as Finding).inputLabel === 'string' && Array.isArray((item as Finding).checks) && (item as Finding).checks.length <= 100 && (item as Finding).checks.every(validCheck)
+  const validFinding = (item: unknown): item is Finding => !!item && typeof item === 'object' && ['GHOST', 'MIRAGE', 'PHANTOM', 'QUANTUM'].includes((item as Finding).engine) && typeof (item as Finding).id === 'string' && typeof (item as Finding).title === 'string' && typeof (item as Finding).createdAt === 'string' && ['HIGH', 'REVIEW', 'INFO'].includes((item as Finding).priority) && typeof (item as Finding).summary === 'string' && typeof (item as Finding).inputLabel === 'string' && Array.isArray((item as Finding).checks) && (item as Finding).checks.length <= 100 && (item as Finding).checks.every(validCheck)
   const validEvidence = (item: unknown): item is EvidenceItem => !!item && typeof item === 'object' && typeof (item as EvidenceItem).id === 'string' && typeof (item as EvidenceItem).title === 'string' && typeof (item as EvidenceItem).type === 'string' && typeof (item as EvidenceItem).addedAt === 'string' && typeof (item as EvidenceItem).summary === 'string'
   const validCase = (item: unknown): item is CaseRecord => {
     if (!item || typeof item !== 'object') return false
     const entry = item as Partial<CaseRecord>
-    return typeof entry.id === 'string' && entry.id.length <= 80 && typeof entry.title === 'string' && entry.title.length <= 120 && typeof entry.purpose === 'string' && entry.purpose.length <= 500 && typeof entry.leadEngine === 'string' && ['GHOST', 'MIRAGE', 'UNASSIGNED'].includes(entry.leadEngine) && ['OPEN', 'IN REVIEW', 'CLOSED'].includes(entry.status ?? '') && ['HIGH', 'REVIEW', 'INFO'].includes(entry.priority ?? '') && typeof entry.createdAt === 'string' && typeof entry.updatedAt === 'string' && Array.isArray(entry.findings) && entry.findings.length <= 1000 && entry.findings.every(validFinding) && Array.isArray(entry.evidence) && entry.evidence.length <= 2000 && entry.evidence.every(validEvidence) && Array.isArray(entry.notes) && entry.notes.length <= 1000 && entry.notes.every(note => typeof note === 'string' && note.length <= 5000)
+    return typeof entry.id === 'string' && entry.id.length <= 80 && typeof entry.title === 'string' && entry.title.length <= 120 && typeof entry.purpose === 'string' && entry.purpose.length <= 500 && typeof entry.leadEngine === 'string' && ['GHOST', 'MIRAGE', 'PHANTOM', 'QUANTUM', 'UNASSIGNED'].includes(entry.leadEngine) && ['OPEN', 'IN REVIEW', 'CLOSED'].includes(entry.status ?? '') && ['HIGH', 'REVIEW', 'INFO'].includes(entry.priority ?? '') && typeof entry.createdAt === 'string' && typeof entry.updatedAt === 'string' && Array.isArray(entry.findings) && entry.findings.length <= 1000 && entry.findings.every(validFinding) && Array.isArray(entry.evidence) && entry.evidence.length <= 2000 && entry.evidence.every(validEvidence) && Array.isArray(entry.notes) && entry.notes.length <= 1000 && entry.notes.every(note => typeof note === 'string' && note.length <= 5000)
   }
   const isAudit = (item: unknown): item is AuditItem => !!item && typeof item === 'object' && typeof (item as AuditItem).id === 'string' && typeof (item as AuditItem).at === 'string' && allowedRoles.includes((item as AuditItem).actor) && typeof (item as AuditItem).action === 'string' && typeof (item as AuditItem).detail === 'string'
   const knownConnectors = ['attack', 'domain-reputation', 'mail-signals']

@@ -1,164 +1,91 @@
 # OBSCURA Phase 3 — System Architecture and Threat Model
 
-**Status:** Proposed architecture for review · **Date:** 2026-11-14
+**Status:** Approved implementation design for the synthetic Firebase pilot; production-data policy remains pending · **Date:** 2026-11-15
 **Depends on:** [Phase 2 Product and Safety Requirements](../product/phase-2-product-and-safety-requirements.md)
+**Implementation plan:** [Firebase Phase 1–10 design](../superpowers/specs/2026-11-15-firebase-phase-1-to-10-design.md)
 
-## 1. Purpose and current state
+## 1. Scope and current state
 
-This document proposes a first backend architecture for the Phase 2 requirements. It is a design artifact, not deployed infrastructure. The current GitHub Pages site remains a public static React/Vite preview with no authenticated backend or persistence.
+This architecture supports a static React/Vite frontend with optional Firebase Authentication and Firestore for a small, invite-only, synthetic-data pilot. It does not add a privileged backend, file storage, external feeds, model APIs, or background jobs. The selected design does not provision or change a Firebase project. Firebase functionality remains unavailable until the project owner configures a project and deploys the reviewed rules.
 
-The goal is a defensive, multi-workspace investigation service with clear evidence provenance and restricted analysis. The design keeps browser code, private evidence, analysis workers, and external intelligence providers in separate trust zones.
+The browser-local demo remains a separate fallback. Firebase mode never imports or uploads local demo state.
 
-## 2. Proposed architecture
-
-### Proposed technology choices
-
-- **Web client:** existing React, TypeScript, and Vite app. Production console access requires authentication; the public landing page contains no secrets.
-- **API:** Python FastAPI service, proposed to support future analysis workers and typed API contracts.
-- **Authentication:** standards-based OIDC provider. Select a vendor only after tenant, region, MFA, session, and recovery requirements are decided.
-- **Authorization:** a separate server-side policy layer that evaluates active account status, workspace membership, role, resource ownership, and requested operation on every request. Identity tokens establish account identity; they do not grant case access.
-- **Primary database:** PostgreSQL for workspace metadata, cases, indicators, findings, job state, and audit references.
-- **Evidence storage:** private object storage with encryption, versioning or immutable originals, and access mediated by the API.
-- **Asynchronous work:** managed queue plus isolated worker containers for file parsing and engine jobs.
-- **External intelligence:** server-side connector service with an explicit provider allowlist, per-source credentials, timeouts, and rate limits.
-- **Operations:** centralized metrics and security events. Raw evidence and credentials are excluded from ordinary logs.
-
-These choices are proposals. A cloud provider, service region, managed identity vendor, storage vendor, queue, budget, and retention policy remain undecided.
-
-### Logical diagram
+## 2. Architecture
 
 ```mermaid
 flowchart LR
-  A[Analyst browser] -->|TLS; OIDC session| W[React web app]
-  W -->|Authenticated API| G[API gateway / rate limits]
-  G --> API[FastAPI service]
-  API --> ID[OIDC authentication]
-  API --> AZ[Authorization policy<br/>membership + role + resource]
-  API --> DB[(PostgreSQL<br/>workspace-scoped records)]
-  API --> Q[Job queue]
-  API --> EV[(Private evidence object storage<br/>quarantine then retained original)]
-  Q --> WK[Isolated analysis workers<br/>no arbitrary outbound network]
-  WK --> EV
-  WK --> DB
-  WK -->|Approved API destinations only| CT[Threat-intelligence connectors]
-  CT --> EXT[Approved provider APIs]
-  API --> AUD[Append-oriented audit events]
-  WK --> AUD
-  API --> OBS[Metrics and security monitoring]
-  WK --> OBS
+  B[Public browser] -->|Static files| P[GitHub Pages]
+  B -->|Google sign-in| A[Firebase Authentication]
+  B -->|Authenticated SDK request| R[Firestore Security Rules]
+  R --> W[(Firestore Standard<br/>synthetic workspace metadata)]
+  B -->|GHOST / MIRAGE / PHANTOM / QUANTUM| L[Local browser analysis]
+  L -->|Bounded result summary only| R
+  O[Project operator] -->|Manages UID allowlist| W
 ```
+
+- **Frontend:** React, TypeScript, Vite, GitHub Pages. The Firebase Web SDK configuration is public and contains no privileged credentials.
+- **Identity:** Firebase Authentication with Google sign-in. Verified, signed-in identity is a prerequisite, not workspace authorization.
+- **Authorization:** Firestore Rules check an operator-maintained `/pilotAllowlist/{uid}` and a workspace membership document for each protected operation. The workspace role is read from Firestore; a client-selected role grants no permission.
+- **Persistence:** Firestore Standard holds workspace metadata, UID membership, synthetic cases, bounded per-check findings, optional hashes, and append-only activity references. Raw inputs and original file bytes are not stored.
+- **Local analysis:** GHOST, MIRAGE, PHANTOM, and QUANTUM demos execute in the browser. No arbitrary URL request, attachment execution, face/biometric identification, live account lookup, or external provider call is made.
+- **Exports:** user-triggered JSON export and schema-validated restore create convenience copies. This is not managed backup, immutable storage, or atomic disaster recovery.
 
 ## 3. Trust boundaries and invariants
 
-1. **Public internet to browser:** all public inputs and provider content are untrusted. The client cannot hold API secrets or make a decision about its own workspace authorization.
-2. **Authentication boundary:** OIDC establishes the account identity and session. Session validity, MFA policy, account status, expiry, revocation, and recovery are checked independently of resource permissions.
-3. **Authorization boundary:** the API asks a server-side policy layer whether this authenticated principal can perform this operation on this exact resource. Every read, write, export, and queued job repeats the relevant authorization check.
-4. **API to storage/database/queue:** service credentials are separate, least-privilege, rotated, and never shipped to browser code. Database queries are workspace-scoped; defense-in-depth row-level policies may be used after application authorization is established.
-5. **Queue to worker:** jobs contain identifiers and narrowly scoped instructions, not broad storage credentials. Workers receive only the case/evidence access needed for the job and have resource/time limits.
-6. **Worker to internet:** arbitrary egress is denied. Only a connector with fixed, reviewed destinations may query Phase 7-approved provider APIs. User-supplied URL values never become fetch destinations.
-7. **Evidence storage:** originals are immutable after intake or retained with versioned custody events. Derived outputs link back to the source hash and transformation.
-8. **External providers:** only documented fields are sent; the provider and purpose are shown before processing. Provider results remain attributed, timestamped, and potentially fallible.
+1. Browser inputs, imported JSON, and all client requests are untrusted. Client validation improves usability; Firestore Rules are the access boundary.
+2. Firebase Web configuration is public. Firebase Admin SDK credentials, service-account keys, signing secrets, and provider keys must never enter the frontend or repository.
+3. A successful Google sign-in does not grant access. A user must be allowlisted and have a current workspace membership.
+4. Workspace documents are tenant-scoped. Reads, writes, exports, and membership changes are constrained by current membership and role. Cross-workspace IDs must fail closed.
+5. The pilot allowlist is maintained through the Firebase Console by a project operator. Workspace clients cannot write it.
+6. Owners and admins can add only already-allowlisted Analyst or Reviewer UIDs. They cannot create new project allowlist entries.
+7. Reviewer accounts can read cases and append a review acknowledgment, but cannot change cases or add analysis findings. Analyst, admin, and owner operations remain bounded by Rules.
+8. Input bytes and raw GHOST/PHANTOM text stay in browser memory. Saved summaries use generic input labels. MIRAGE and QUANTUM may save SHA-256 digests when explicitly requested; a digest can still identify content and remains governed data.
+9. The pilot accepts synthetic/demo data only. A shape-valid record is not proof that its contents are synthetic; authorized members remain trusted data operators until a separately reviewed intake service exists.
+10. No Cloud Storage, Cloud Functions, paid AI API, live connector, or external threat feed is included. No local-demo state is migrated to Firebase.
 
-## 4. Initial data flow
+## 4. Initial Firestore model
 
-1. Authenticate the analyst through OIDC; validate session, MFA policy, account state, expiry, and revocation.
-2. Separately authorize the requested operation on the exact case/evidence/resource using server-side workspace membership, role, and ownership policy. Deny if any check is absent or ambiguous.
-3. Create or authorize a case. Record the defensive purpose and validate the requested operation against the workspace policy.
-4. For text indicators, normalize and defang display values; store an original representation only when necessary and permitted.
-5. For an evidence file, enforce Phase 7 size/type/retention policy, calculate a SHA-256 digest at intake, write to private quarantine, and create a custody event.
-6. Create a narrowly scoped queue job. The worker reads only the quarantined object through a temporary, least-privilege credential.
-7. Parse supported metadata using sandboxed libraries with strict CPU, memory, file count, decompression, and wall-clock limits. Never execute files, macros, scripts, or embedded content.
-8. Store derived outputs separately, tied to the original digest, engine/version, input IDs, source timestamps, individual check states, and result state.
-9. The UI shows evidence lineage, supporting observations, stale/conflicting sources, and checks that could not be verified. A risk score is a ranking, not a probability unless calibration has been validated for a defined target.
-10. An analyst or reviewer records the conclusion; the system does not silently convert a score into an external action.
-11. Apply retention and deletion policy to primary records, derived files, caches, and backups. Record deletion events without retaining deleted evidence content.
-
-## 5. Threat model
-
-### Assets
-
-- Case content, evidence files, notes, findings, and reports.
-- Workspace membership, roles, identity sessions, and recovery paths.
-- Provider API credentials and storage/queue/database service credentials.
-- Original evidence integrity, custody events, and result provenance.
-- Service availability, audit records, and model/dataset integrity in later phases.
-
-### Threat actors
-
-- An unauthenticated internet user probing the public site or API.
-- A malicious or compromised workspace user attempting to exceed their role.
-- An attacker submitting crafted URLs, documents, archives, media, or headers.
-- A compromised provider, dependency, account, or CI/CD credential.
-- A poisoning actor submitting false indicators or labels into future intelligence/model pipelines.
-- An authorized insider misusing evidence access.
-
-### Threats and required controls
-
-| Threat | Example impact | Required design controls |
+| Path | Purpose | Rules boundary |
 |---|---|---|
-| Broken object-level authorization / IDOR | User reads or edits another workspace's case or evidence | Server-side membership and role checks on every request; workspace scoping in queries; negative cross-tenant tests; audit denied access |
-| Account/session takeover | Unauthorized case access or report export | OIDC, MFA policy, secure session/token handling, short-lived recovery links, rate limits, revocation, and alerts for sensitive account changes |
-| Authentication bypass or confused identity | Request is attributed to the wrong account or an expired/revoked session remains usable | Validate OIDC issuer, audience, signature, nonce/state, expiry and revocation/session state; separate identity proof from permissions; test expired, malformed, replayed, and disabled-account sessions |
-| Malicious file or parser exploit | Worker compromise, data theft, or service outage | Quarantine, sandboxed non-root workers, no arbitrary egress, parser allowlist, resource caps, patched dependencies, temporary credentials, and disposal after each job |
-| SSRF through user-supplied URL | Internal service access or cloud metadata disclosure | Never fetch submitted URLs; accept defanged text; fixed provider endpoints; egress firewall and DNS/IP validation at connector boundary |
-| Archive/decompression bomb | Worker exhaustion or storage growth | Reject unsupported archives initially; set recursion, expansion, count, size, CPU, and wall-clock limits |
-| Stored XSS / injection in evidence or provider data | Analyst session compromise or misleading findings | Treat all imported content as text; output encoding; restrictive CSP; validated rich-text policy; safe CSV/report export encoding |
-| Cross-tenant query or cache leakage | Evidence or metadata disclosed across workspaces | Tenant-bound cache keys, database scoping, authorization before cache access, per-workspace storage prefixes, and isolation tests |
-| Credential or evidence leakage in logs/build | Public disclosure of secrets or private evidence | Secret manager in deployment, CI secret scanning, redact request bodies, prohibit evidence logging, review build artifacts, and rotate suspected credentials |
-| Provider compromise, outage, or bad data | Incorrect or unavailable findings | Provider allowlist and terms review, timeouts, circuit breaker, source attribution and age, explicit partial/unavailable results, independent corroboration |
-| Poisoned indicators or model labels | Biased or adversarial prioritization | Source trust tiers, provenance, duplicate and label review, time-based evaluation, feedback quarantine, drift monitoring, rollback, and human review |
-| Insider misuse | Sensitive evidence accessed without case need | Least privilege, separation of operator and analyst roles, audited break-glass access, access review, and documented incident response |
-| Denial of service / cost exhaustion | Queue, API, storage, or provider limits exhausted | Per-user/workspace quotas, upload limits, bounded jobs, rate limiting, billing alerts, and administrator controls |
-| Incomplete or unusable backups | Case or evidence loss after deletion, corruption, or provider outage | Define backup scope, encryption, access, frequency, retention, and recovery targets; restore into an isolated environment; verify counts, hashes, workspace isolation, and application readability; repeat drills and record results |
-| Unsafe PHANTOM identity inference | False identification or biometric harm | Prohibit face recognition/biometric matching; limit features to approved brand/domain/text context; require human review and provenance |
-| Incorrect cryptographic claim | False assurance from a hash/signature/proof screen | Deterministic vetted algorithms; key/context validation; explicit educational-demo labeling; no model-generated verification verdict |
+| `/pilotAllowlist/{uid}` | Project-operator invitation record | Authenticated user can read only their own UID record; all client writes and list operations denied |
+| `/users/{uid}/workspaces/{workspaceId}` | Minimal workspace discovery index | User reads own index; writes require matching, valid membership state |
+| `/workspaces/{workspaceId}` | Workspace name, purpose, owner UID, timestamps, schema version | Member reads; allowlisted user can create an owner workspace; owner/admin may update bounded fields |
+| `/workspaces/{workspaceId}/members/{uid}` | Role and membership metadata; no email | Member reads; owner/admin may add allowlisted Analyst/Reviewer UIDs or remove non-owner membership |
+| `/workspaces/{workspaceId}/cases/{caseId}` | Bounded synthetic case metadata and lifecycle | Member reads; owner/admin/analyst create, update, and delete within schema and state-transition limits |
+| `/workspaces/{workspaceId}/cases/{caseId}/findings/{findingId}` | Per-check summaries, result states, limitations, optional digest | Member reads; owner/admin/analyst create immutable records; client update/delete denied |
+| `/workspaces/{workspaceId}/activity/{eventId}` | Append-only actor UID, action, target ID, and timestamp | Member reads and appends own actor UID; update/delete denied |
 
-## 6. Security and privacy requirements for implementation
+Firestore does not cascade subcollection deletion. Finding and activity records are append-only, and production deletion/retention semantics are not finalized. The user interface therefore closes cases and retains audit references instead of implying destructive deletion.
 
-- Use OWASP ASVS 5.0 as a requirements checklist for application and API controls, then document the verification level selected for the initial release.
-- Map operational security work to NIST CSF 2.0 outcomes for Govern, Identify, Protect, Detect, Respond, and Recover.
-- Use secure headers including a restrictive Content Security Policy, HSTS at the production host, and appropriate framing and MIME protections.
-- Use parameterized database access, schema validation, request limits, output encoding, and explicit CORS origins.
-- Do not grant browser JavaScript direct access to object storage or secret-bearing providers. Use short-lived, scoped transfer permissions only after server-side authorization.
-- Encrypt evidence and backups with managed keys. Define key rotation and recovery before real evidence is accepted.
-- Define recovery objectives and backup scope before live case storage. Before production evidence is accepted, restore a representative backup into an isolated environment and verify evidence hashes, case links, access isolation, and retention/deletion expectations. Repeat restore drills on a documented schedule.
-- Maintain an append-oriented audit trail for authentication changes, case/evidence access, exports, provider lookups, retention actions, and privileged operations. Audit records must avoid storing evidence bodies.
-- Keep rule-based GHOST and MIRAGE checks usable without an AI API. Any optional model adapter is isolated from baseline checks; provider unavailability must not erase or suppress rule results.
-- Store findings as per-check records with input references, observations, source freshness, status, rule/model version, and unverified or conflicting checks. Do not label an uncalibrated priority score as a probability.
-- Do not connect an external data feed until its Phase 7 source-governance record is approved.
-- Keep public landing-page hosting separate from authenticated application and API origins when the production architecture is selected.
-- Have a documented incident process for suspected cross-tenant access, evidence exposure, provider compromise, or poisoned data.
+## 5. Threats and controls
 
-## 7. Security decision log
-
-| Decision | Proposed default | Must be resolved before |
+| Threat | Control in this milestone | Residual risk or follow-up |
 |---|---|---|
-| Backend language | FastAPI/Python, matching future analysis tooling | Backend implementation |
-| Tenant isolation | Workspace authorization on every request plus database scoping | Any multi-user case data |
-| Evidence processing | Quarantine plus isolated short-lived workers | Any upload becomes active |
-| Network access from workers | Deny by default; allow fixed provider API hosts through connectors | Any external lookup |
-| Data region and hosting provider | Undecided | Real case data or customer accounts |
-| Evidence retention and backup expiry | Undecided; no real upload until selected | Evidence storage |
-| Authentication provider/MFA/recovery | OIDC; vendor and policy undecided | User accounts |
-| Authorization policy | Separate workspace membership, roles, ownership, and action checks; detailed policy to be approved | Multi-user case access |
-| Object storage, queue, and secret manager | Provider-neutral interfaces; vendor undecided | Deployment implementation |
-| Backup/recovery objectives | Define RPO/RTO, backup retention, restore schedule, and recovery owner | Production case data |
-| External data inventory | Terms, permissions, attribution, purpose, fields, freshness, retention, deletion | Any external ingestion |
+| Uninvited account reads workspace data | UID allowlist and membership checks on every protected operation | Account compromise or project-operator allowlist error remains possible |
+| Client forges an admin role | Role is read from the membership document; writes checked by Firestore Rules | Rules must be deployed to the intended project and emulator tests must pass first |
+| Cross-workspace ID substitution | Every case/finding/activity path checks parent workspace membership | Emulator tests are required before enabling a real project |
+| Malformed or oversized document | Strict field allowlists, per-field lengths, small check counts, and lifecycle checks | Data can still be semantically sensitive; only synthetic content is permitted |
+| User pastes sensitive email/profile content | Browser-local analysis; Firebase repository strips raw input labels and does not upload source bytes/text | A malicious or modified client can write allowed strings; not a real-evidence service |
+| Suspicious URL causes victim-side request | Inputs are parsed as text; no URL open, fetch, DNS lookup, or live reputation request | Future connectors need fixed destinations, server-side egress controls, and source approval |
+| Attachment or image executes | MIRAGE/QUANTUM read selected bytes locally for bounded parsing/hash only; no execution or upload | Client/browser compromise remains outside this demo's protection |
+| Face recognition or person attribution | PHANTOM uses only simple text indicators and expressly avoids identity claims | Future visual-brand analysis requires separate approval and strict non-biometric design |
+| Export leaks workspace data | Export is explicit, bounded, and initiated by an authorized member | Downloads follow the user's device/browser controls; no managed backup policy exists |
+| Abuse drives quota or unexpected costs | No live feeds, large jobs, storage bucket, Functions, or AI API | Firestore project quotas/alerts and billing controls must be configured by the owner |
+| Lost or compromised user account | Firebase Auth session and explicit sign-out | MFA, account recovery, revocation, support, and incident procedures are project/operator responsibilities |
 
-## 8. Phase 3 completion criteria
+## 6. Local verification and deployment gates
 
-- Phase 2 decisions that affect tenant boundaries, evidence handling, providers, and retention are resolved or explicitly deferred with a no-live-data gate.
-- Authentication and authorization have distinct components, responsibilities, and validation plans.
-- Every data flow and trust boundary has an owner and a required control.
-- A backup and restore design includes a documented rehearsal gate before production evidence storage.
-- Phase 7 data-governance approval is a hard dependency for Phase 8 connectors.
-- A GHOST/MIRAGE MVP can save per-check, sourced results to a case using authorized representative inputs without any model API dependency.
-- The threat table is converted into implementation requirements and security review items.
-- A deployment diagram, secret inventory, data-retention plan, backup plan, and incident process exist before production data is accepted.
-- No design path depends on opening suspicious URLs, executing attachments, face identification, or unreviewed model actions.
+- Keep Firebase configuration blank to run the isolated browser-local demo.
+- Run TypeScript build and unit tests before use.
+- Install Java and run the Auth/Firestore Emulator Suite tests before deploying Rules or enabling a Firebase project.
+- Review the selected Firebase project, Firestore location, authorized domains, Authentication provider, and billing limits before configuration.
+- Deploy only the checked-in `firestore.rules` and indexes to an explicitly selected project after emulator validation.
+- Never place real evidence, personal data, credentials, private keys, or confidential incident material in this pilot.
+- Approve data classification, jurisdiction, retention/deletion, account lifecycle, monitoring, incident response, managed backup and tested recovery before considering production use.
+- Do not enable Storage, Functions, external sources, or model APIs without a new scoped design and explicit billing/policy review.
 
 ## References
 
 - [NIST Cybersecurity Framework 2.0](https://www.nist.gov/cyberframework)
 - [OWASP Application Security Verification Standard 5.0](https://asvs.owasp.org/)
-- [NIST AI Risk Management Framework](https://airc.nist.gov/airmf-resources/airmf/5-sec-core/)
+- [Firebase Security Rules](https://firebase.google.com/docs/rules)

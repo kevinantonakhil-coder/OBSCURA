@@ -1,0 +1,207 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function self(uid) { return signedIn() && request.auth.uid == uid; }
+    function allowlisted(uid) { return exists(/databases/$(database)/documents/pilotAllowlist/$(uid)); }
+    function isMember(workspaceId) {
+      return signedIn() && allowlisted(request.auth.uid)
+        && exists(/databases/$(database)/documents/workspaces/$(workspaceId)/members/$(request.auth.uid));
+    }
+    function role(workspaceId) {
+      return get(/databases/$(database)/documents/workspaces/$(workspaceId)/members/$(request.auth.uid)).data.role;
+    }
+    function isAdmin(workspaceId) { return isMember(workspaceId) && role(workspaceId) in ['owner', 'admin']; }
+    function canAnalyze(workspaceId) { return isMember(workspaceId) && role(workspaceId) in ['owner', 'admin', 'analyst']; }
+    function validWorkspace(data) {
+      return data.keys().hasAll(['name','purpose','ownerUid','createdAt','updatedAt','schemaVersion'])
+        && data.keys().hasOnly(['name','purpose','ownerUid','createdAt','updatedAt','schemaVersion'])
+        && data.name is string && data.name.size() > 0 && data.name.size() <= 80
+        && data.purpose is string && data.purpose.size() <= 500
+        && data.ownerUid is string && data.ownerUid.size() <= 128
+        && data.createdAt is timestamp && data.updatedAt is timestamp && data.schemaVersion == 1;
+    }
+    function validMember(data) {
+      return data.keys().hasAll(['uid','role','status','invitedBy','createdAt'])
+        && data.keys().hasOnly(['uid','role','status','invitedBy','createdAt'])
+        && data.uid is string && data.uid.size() > 0 && data.uid.size() <= 128
+        && data.role in ['owner','admin','analyst','reviewer'] && data.status == 'active'
+        && data.invitedBy is string && data.invitedBy.size() <= 128 && data.createdAt is timestamp;
+    }
+    function validCase(data) {
+      return data.keys().hasAll(['title','purpose','leadEngine','status','priority','createdBy','createdAt','updatedAt','synthetic'])
+        && data.keys().hasOnly(['title','purpose','leadEngine','status','priority','createdBy','createdAt','updatedAt','synthetic'])
+        && data.title is string && data.title.size() > 0 && data.title.size() <= 120
+        && data.purpose is string && data.purpose.size() <= 500
+        && data.leadEngine in ['GHOST','MIRAGE','PHANTOM','QUANTUM','UNASSIGNED'] && data.status in ['OPEN','IN REVIEW','CLOSED']
+        && data.priority in ['HIGH','REVIEW','INFO'] && data.createdBy is string && data.createdBy.size() <= 128
+        && data.createdAt is timestamp && data.updatedAt is timestamp && data.synthetic == true;
+    }
+    function validCheck(check) {
+      return check is map && check.keys().hasAll(['id','title','state','detail','source'])
+        && check.keys().hasOnly(['id','title','state','detail','source'])
+        && check.id is string && check.id.size() > 0 && check.id.size() <= 40
+        && check.title is string && check.title.size() > 0 && check.title.size() <= 120
+        && check.state in ['PASS','SIGNAL','UNKNOWN','UNAVAILABLE']
+        && check.detail is string && check.detail.size() > 0 && check.detail.size() <= 500
+        && check.source is string && check.source.size() > 0 && check.source.size() <= 120;
+    }
+    function validChecks(checks) {
+      return checks is list && checks.size() <= 12
+        && (checks.size() < 1 || validCheck(checks[0])) && (checks.size() < 2 || validCheck(checks[1]))
+        && (checks.size() < 3 || validCheck(checks[2])) && (checks.size() < 4 || validCheck(checks[3]))
+        && (checks.size() < 5 || validCheck(checks[4])) && (checks.size() < 6 || validCheck(checks[5]))
+        && (checks.size() < 7 || validCheck(checks[6])) && (checks.size() < 8 || validCheck(checks[7]))
+        && (checks.size() < 9 || validCheck(checks[8])) && (checks.size() < 10 || validCheck(checks[9]))
+        && (checks.size() < 11 || validCheck(checks[10])) && (checks.size() < 12 || validCheck(checks[11]));
+    }
+    function validFinding(data) {
+      return data.keys().hasAll(['engine','title','createdBy','createdAt','priority','summary','inputLabel','checks','synthetic'])
+        && data.keys().hasOnly(['engine','title','createdBy','createdAt','priority','summary','inputLabel','checks','digest','synthetic'])
+        && data.engine in ['GHOST','MIRAGE','PHANTOM','QUANTUM'] && data.title is string && data.title.size() > 0 && data.title.size() <= 120
+        && data.createdBy is string && data.createdBy.size() <= 128 && data.createdAt is timestamp
+        && data.priority in ['HIGH','REVIEW','INFO'] && data.summary is string && data.summary.size() > 0 && data.summary.size() <= 1000
+        && data.inputLabel is string && data.inputLabel.size() > 0 && data.inputLabel.size() <= 200
+        && validChecks(data.checks)
+        && (!('digest' in data) || (data.digest is string && data.digest.matches('^[a-fA-F0-9]{64}$')))
+        && data.synthetic == true;
+    }
+    function validActivity(data) {
+      return data.keys().hasAll(['actorUid','action','targetId','createdAt'])
+        && data.keys().hasOnly(['actorUid','action','targetId','createdAt','findingId','noteId'])
+        && data.actorUid == request.auth.uid && data.action is string && data.action.size() > 0 && data.action.size() <= 80
+        && data.targetId is string && data.targetId.size() > 0 && data.targetId.size() <= 128
+        // serverTimestamp() resolves to request.time; client-chosen dates cannot poison audit ordering.
+        && data.createdAt is timestamp && data.createdAt == request.time
+        && (!('findingId' in data) || (data.action == 'FINDING_SAVED' && data.findingId is string && data.findingId.size() > 0 && data.findingId.size() <= 128))
+        && (data.action != 'FINDING_SAVED' || 'findingId' in data)
+        && (!('noteId' in data) || (data.action == 'CASE_NOTE_ADDED' && data.noteId is string && data.noteId.size() > 0 && data.noteId.size() <= 128))
+        && (data.action != 'CASE_NOTE_ADDED' || 'noteId' in data);
+    }
+    function validActivityAction(data, workspaceId) {
+      return (data.action == 'WORKSPACE_CREATED' && data.targetId == workspaceId && allowlisted(request.auth.uid)
+          && !exists(/databases/$(database)/documents/workspaces/$(workspaceId))
+          && getAfter(/databases/$(database)/documents/workspaces/$(workspaceId)).data.ownerUid == request.auth.uid
+          && existsAfter(/databases/$(database)/documents/workspaces/$(workspaceId)/members/$(request.auth.uid)))
+        || (data.action == 'CASE_CREATED' && canAnalyze(workspaceId)
+          && !exists(/databases/$(database)/documents/workspaces/$(workspaceId)/cases/$(data.targetId))
+          && existsAfter(/databases/$(database)/documents/workspaces/$(workspaceId)/cases/$(data.targetId))
+          && getAfter(/databases/$(database)/documents/workspaces/$(workspaceId)/cases/$(data.targetId)).data.createdBy == request.auth.uid)
+        || (data.action == 'CASE_UPDATED' && canAnalyze(workspaceId)
+          && exists(/databases/$(database)/documents/workspaces/$(workspaceId)/cases/$(data.targetId))
+          && getAfter(/databases/$(database)/documents/workspaces/$(workspaceId)/cases/$(data.targetId)).data.updatedAt
+            > get(/databases/$(database)/documents/workspaces/$(workspaceId)/cases/$(data.targetId)).data.updatedAt)
+        || (data.action == 'CASE_NOTE_ADDED' && canAnalyze(workspaceId)
+          && !exists(/databases/$(database)/documents/workspaces/$(workspaceId)/cases/$(data.targetId)/notes/$(data.noteId))
+          && existsAfter(/databases/$(database)/documents/workspaces/$(workspaceId)/cases/$(data.targetId)/notes/$(data.noteId))
+          && getAfter(/databases/$(database)/documents/workspaces/$(workspaceId)/cases/$(data.targetId)/notes/$(data.noteId)).data.authorUid == request.auth.uid)
+        || (data.action == 'FINDING_SAVED' && canAnalyze(workspaceId)
+          && exists(/databases/$(database)/documents/workspaces/$(workspaceId)/cases/$(data.targetId))
+          && existsAfter(/databases/$(database)/documents/workspaces/$(workspaceId)/cases/$(data.targetId))
+          && !exists(/databases/$(database)/documents/workspaces/$(workspaceId)/cases/$(data.targetId)/findings/$(data.findingId))
+          && existsAfter(/databases/$(database)/documents/workspaces/$(workspaceId)/cases/$(data.targetId)/findings/$(data.findingId))
+          && getAfter(/databases/$(database)/documents/workspaces/$(workspaceId)/cases/$(data.targetId)/findings/$(data.findingId)).data.createdBy == request.auth.uid
+          && getAfter(/databases/$(database)/documents/workspaces/$(workspaceId)/cases/$(data.targetId)).data.updatedAt
+            > get(/databases/$(database)/documents/workspaces/$(workspaceId)/cases/$(data.targetId)).data.updatedAt)
+        || (data.action == 'MEMBER_ADDED' && isAdmin(workspaceId)
+          && !exists(/databases/$(database)/documents/workspaces/$(workspaceId)/members/$(data.targetId))
+          && existsAfter(/databases/$(database)/documents/workspaces/$(workspaceId)/members/$(data.targetId))
+          && getAfter(/databases/$(database)/documents/workspaces/$(workspaceId)/members/$(data.targetId)).data.invitedBy == request.auth.uid)
+        || (data.action == 'MEMBER_REMOVED' && isAdmin(workspaceId)
+          && exists(/databases/$(database)/documents/workspaces/$(workspaceId)/members/$(data.targetId))
+          && !existsAfter(/databases/$(database)/documents/workspaces/$(workspaceId)/members/$(data.targetId))
+          && data.targetId != get(/databases/$(database)/documents/workspaces/$(workspaceId)).data.ownerUid)
+        || (data.action == 'REVIEW_ACKNOWLEDGED' && isMember(workspaceId) && role(workspaceId) == 'reviewer'
+          && exists(/databases/$(database)/documents/workspaces/$(workspaceId)/cases/$(data.targetId)));
+    }
+    function validWorkspaceIndex(data, uid, workspaceId) {
+      return data.keys().hasAll(['workspaceId','createdAt']) && data.keys().hasOnly(['workspaceId','createdAt'])
+        && data.workspaceId == workspaceId && data.createdAt is timestamp;
+    }
+    function validStatusChange() {
+      return request.resource.data.status == resource.data.status
+        || (resource.data.status == 'OPEN' && request.resource.data.status == 'IN REVIEW')
+        || (resource.data.status == 'IN REVIEW' && request.resource.data.status == 'CLOSED')
+        || (resource.data.status == 'CLOSED' && request.resource.data.status == 'IN REVIEW');
+    }
+
+    // A user can only check their own UID. Allowlist records are never writable from the client.
+    match /pilotAllowlist/{uid} {
+      allow get: if self(uid);
+      allow list, create, update, delete: if false;
+    }
+
+    // Minimal index enables users to discover their own workspaces. Actual access is still checked against membership.
+    match /users/{uid}/workspaces/{workspaceId} {
+      allow get, list: if self(uid) && allowlisted(uid);
+      allow create: if validWorkspaceIndex(request.resource.data, uid, workspaceId) && allowlisted(uid)
+        && ((self(uid) && existsAfter(/databases/$(database)/documents/workspaces/$(workspaceId)/members/$(uid)))
+          || (isAdmin(workspaceId) && existsAfter(/databases/$(database)/documents/workspaces/$(workspaceId)/members/$(uid))));
+      allow update: if false;
+      allow delete: if self(uid) || (isAdmin(workspaceId) && !existsAfter(/databases/$(database)/documents/workspaces/$(workspaceId)/members/$(uid)));
+    }
+
+    match /workspaces/{workspaceId} {
+      allow get: if isMember(workspaceId);
+      allow list: if signedIn() && allowlisted(request.auth.uid) && resource.data.ownerUid == request.auth.uid;
+      allow create: if signedIn() && allowlisted(request.auth.uid) && validWorkspace(request.resource.data)
+        && request.resource.data.ownerUid == request.auth.uid;
+      allow update: if isAdmin(workspaceId) && validWorkspace(request.resource.data)
+        && request.resource.data.ownerUid == resource.data.ownerUid
+        && request.resource.data.createdAt == resource.data.createdAt;
+      allow delete: if false;
+
+      match /members/{uid} {
+        allow get, list: if isMember(workspaceId) || (self(uid) && allowlisted(uid));
+        allow create: if signedIn() && validMember(request.resource.data) && request.resource.data.uid == uid
+          && allowlisted(uid) && request.resource.data.role in ['analyst','reviewer']
+          && request.resource.data.invitedBy == request.auth.uid && isAdmin(workspaceId);
+        allow create: if signedIn() && validMember(request.resource.data) && uid == request.auth.uid
+          && request.resource.data.uid == request.auth.uid && request.resource.data.role == 'owner'
+          && request.resource.data.invitedBy == request.auth.uid && allowlisted(request.auth.uid)
+          && getAfter(/databases/$(database)/documents/workspaces/$(workspaceId)).data.ownerUid == request.auth.uid;
+        // Role changes are not exposed in the pilot UI. Require remove-and-reinvite so each change has an audit trail.
+        allow update: if false;
+        allow delete: if isAdmin(workspaceId) && uid != get(/databases/$(database)/documents/workspaces/$(workspaceId)).data.ownerUid;
+      }
+
+      match /activity/{eventId} {
+        allow get, list: if isMember(workspaceId);
+        allow create: if validActivity(request.resource.data) && validActivityAction(request.resource.data, workspaceId);
+        allow update, delete: if false;
+      }
+
+      match /cases/{caseId} {
+        allow get, list: if isMember(workspaceId);
+        allow create: if canAnalyze(workspaceId) && validCase(request.resource.data)
+          && request.resource.data.createdBy == request.auth.uid;
+        allow update: if canAnalyze(workspaceId) && validCase(request.resource.data) && validStatusChange()
+          && request.resource.data.createdBy == resource.data.createdBy
+          && request.resource.data.createdAt == resource.data.createdAt
+          && request.resource.data.updatedAt >= resource.data.updatedAt;
+        allow delete: if false;
+
+        match /findings/{findingId} {
+          allow get, list: if isMember(workspaceId);
+          allow create: if canAnalyze(workspaceId) && validFinding(request.resource.data)
+            && request.resource.data.createdBy == request.auth.uid;
+          allow update, delete: if false;
+        }
+
+        match /notes/{noteId} {
+          allow get, list: if isMember(workspaceId);
+          allow create: if canAnalyze(workspaceId) && exists(/databases/$(database)/documents/workspaces/$(workspaceId)/cases/$(caseId))
+            && request.resource.data.keys().hasAll(['authorUid','body','createdAt'])
+            && request.resource.data.keys().hasOnly(['authorUid','body','createdAt'])
+            && request.resource.data.authorUid == request.auth.uid && request.resource.data.body is string
+            && request.resource.data.body.size() > 0 && request.resource.data.body.size() <= 1000
+            && request.resource.data.createdAt is timestamp && request.resource.data.createdAt == request.time;
+          allow update, delete: if false;
+        }
+
+      }
+    }
+
+    match /{document=**} { allow read, write: if false; }
+  }
+}

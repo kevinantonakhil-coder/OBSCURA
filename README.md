@@ -2,53 +2,75 @@
 
 **SEE BEYOND THE SURFACE.**
 
-The project is a responsive React and TypeScript browser-local demonstration of the OBSCURA workflows through Phase 10. It includes the public landing page and a separate Intelligence Console. Cases and saved findings persist in this browser's local storage. All bundled records and connector responses are synthetic demo data.
+OBSCURA is a polished React, TypeScript and Vite cybersecurity demo with a public landing page, an isolated browser-local console, and an optional Firebase-backed synthetic pilot. The Firebase project is not connected in this repository. Nothing has been deployed or published as part of this implementation.
 
-## Local setup
+## Run the local demo
 
 Requirements: Node.js 20.19+ or 22.12+ and npm.
 
 ```sh
-npm install
+npm ci
 npm run dev
 ```
 
-Vite prints a local address to open in your browser. To create a production build locally, run `npm run build`, then `npm run preview` to view that build.
+Open the local address Vite prints. With Firebase values left blank, the public site and browser-local demo work without accounts or cloud services.
 
-The demo does not need environment variables, credentials, or API keys. Do not put secrets in frontend variables: values prefixed with `VITE_` are exposed to browser users.
+```sh
+npm test
+npm run build
+```
 
-## Working demo workflows
+The Firebase Security Rules suite needs the Firebase Local Emulator Suite and Java 21 or newer. You do not need to install Java locally: the GitHub Actions verification job installs Java 21 on its hosted runner, runs the emulator suite, and only allows the Pages deployment job to start if verification passes.
 
-- Create, search, open, update, and delete local demo cases. Add review notes and inspect saved findings and evidence summaries.
-- **GHOST (Phase 9 demo):** deterministic text-only checks for domain strings and sanitized email headers. No DNS, registration, reputation, URL, or mailbox lookups.
-- **MIRAGE (Phase 10 demo):** locally inspect PNG/JPEG signatures and bounded header metadata, calculate SHA-256 for files up to 25 MB, and save a review summary. No image bytes are uploaded or saved; metadata and a digest cannot establish authenticity.
-- Export case summaries, evidence registers, or a browser-state backup as JSON.
-- Review Phase 7 data-handling rules, inspect the audit list, and run Phase 8 connector fixtures. Fixture toggles never contact external sources.
-- Choose an Analyst, Reviewer, or Workspace admin demo role. The role preview changes interface permissions only; it does not secure stored data.
-- Responsive landing and console layouts, visible keyboard focus, and reduced-motion support.
+```sh
+npm run test:rules
+```
 
-## Demo boundaries
+For a local run, the first run downloads Firebase CLI/emulator tooling. The suite uses the isolated `demo-obscura` project ID and does not connect to a real Firebase project. Pushing a change to `main` runs the same checks in GitHub Actions before publishing the site.
 
-- This is not a production SOC or a live threat-intelligence service. GHOST and MIRAGE use local rules only; no AI API, external feed, DNS lookup, URL visit, attachment execution, or backend request is made.
-- Browser local storage is not encrypted, is device/browser-specific, and is not appropriate for real incidents, personal data, secrets, or confidential evidence. Use synthetic inputs only.
-- Phase 4 Firebase Authentication is not connected because this repository has no Firebase project configuration. The sign-in page is a demo role picker, not account authentication.
-- Phase 5 authorization is a role-based UI demonstration. Real permission enforcement requires a protected backend and server-side rules.
-- Phase 6 server persistence, backups, and recovery drills are not implemented. Downloaded JSON is a user-created demo export, not a managed backup service.
-- Phase 8 connector examples are bundled fixtures and may not reflect current threat information.
-- PHANTOM and QUANTUM are roadmap previews beyond this Phase 10 demo; neither engine performs analysis.
+## Firebase pilot configuration
 
-## Planned phases
+Firebase integration is optional. To run the connected path, the project owner must create/select a Firebase project, register a Web app, enable Google Authentication, create a Firestore Standard database, and enable Firestore rules before use.
 
-See the [20-phase product roadmap](docs/roadmap/phase-1-to-20.md). Phase 2 product and safety requirements are a complete working draft pending review. Phase 3 architecture remains a proposal; Firebase is the selected Phase 4 authentication direction, but no project is connected. Later roadmap phases describe proposed milestones, not live capabilities or launch promises. GitHub Pages publishes a static frontend only.
+1. Copy `.env.example` to `.env.local` and add the Firebase Web app values. These `VITE_FIREBASE_*` values are public client configuration, not service-account secrets.
+2. Add the deployed site origin to Firebase Authentication's authorized domains.
+3. Deploy the checked-in Firestore rules to the selected project. Never add Firebase Admin credentials to this repository or browser build.
+4. Sign in, then add the account's Firebase UID to `/pilotAllowlist/{uid}` in the Firebase Console. Allowlist writes are intentionally blocked from the app.
+5. Create a workspace. To add colleagues, first allowlist each colleague's UID, then assign Analyst or Reviewer membership from Workspace members.
 
-Phase 2 product and safety requirements: [docs/product/phase-2-product-and-safety-requirements.md](docs/product/phase-2-product-and-safety-requirements.md).
+GitHub Pages builds read optional repository **Variables** named `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_PROJECT_ID`, and `VITE_FIREBASE_APP_ID`. Leave them unset to publish the static browser-local version. Do not add service-account JSON, private keys, or other secrets.
 
-Phase 3 proposed architecture and threat model: [docs/architecture/phase-3-system-architecture-and-threat-model.md](docs/architecture/phase-3-system-architecture-and-threat-model.md).
+No Firebase project, database, or billing plan is created or changed by this repository work. No paid API or external intelligence source is used. Review the project's usage and billing settings before connecting a real Firebase project.
 
-## GitHub
+## Working demo features
 
-The project source is in the public `kevinantonakhil-coder/OBSCURA` repository. Its GitHub Actions Pages workflow builds on pushes to `main`. These local changes are not published automatically; publish only after reviewing and pushing them. `.gitignore` excludes dependencies, build output, environment files and TypeScript build metadata.
+- Responsive OBSCURA public landing page and separate Intelligence Console.
+- Browser-local demo cases, reports, JSON backup/restore, governance guidance, audit preview, and fixture-only connector examples.
+- **GHOST:** deterministic local checks for domain text and sanitized email-header text. No DNS, registration, reputation, mailbox, URL, or network requests.
+- **MIRAGE:** local PNG/JPEG header inspection and SHA-256 hashing. Original bytes are not uploaded or saved; a digest does not establish authenticity.
+- **PHANTOM:** text-only brand and handle review cues. It does not identify people, compare faces, or verify live account ownership.
+- **QUANTUM:** local SHA-256 file hash, ephemeral ECDSA signature exercise, and a deliberately insecure toy zero-knowledge protocol example. None of these demos establishes real-world identity or production security.
+- Optional Firebase Auth and Firestore workflow: pilot UID allowlist, membership roles, synthetic workspaces, cases, bounded per-check findings, append-only activity, member management, and schema-validated JSON export/restore.
+- Firestore Rules deny by default and enforce workspace membership and roles. Rules tests run in the local emulator; GitHub Actions provisions Java 21 so local Java installation is optional.
 
-## Stack
+## Safety and data boundaries
 
-React, TypeScript, Vite, Tailwind CSS, Framer Motion and Lucide. Styling uses custom CSS tokens and components alongside Tailwind's Vite integration.
+- The connected pilot is intended for synthetic or approved public test data. Firestore validates document shape, not the meaning of user-entered text; never enter real incident details, personal data, or secrets. It rejects evidence uploads and does not store raw GHOST text, PHANTOM profile text, MIRAGE image bytes, QUANTUM source files, or private signing keys.
+- Analysis runs locally in the browser. Suspicious URLs are never opened or fetched, attachments are never executed, and no live threat-intelligence source is connected.
+- Signals and priorities are review cues, not probabilities or accusations. Unknown and unavailable checks are shown explicitly.
+- Browser local storage is not encrypted and is device/browser-specific. It is not appropriate for real incidents, confidential evidence, secrets, or personal data.
+- JSON export/restore is a user-triggered convenience workflow, not a managed backup service or atomic disaster-recovery system. Removing a Firebase membership does not delete prior records.
+- Do not use real case evidence until data location, access, retention, deletion, incident response, and recovery policies are approved and tested.
+- PHANTOM and QUANTUM are local educational demonstrations, not production identity or cryptographic services. No ML model is included; deterministic rules remain usable without an AI API.
+
+## Product plan
+
+The complete 20-phase roadmap is in [docs/roadmap/phase-1-to-20.md](docs/roadmap/phase-1-to-20.md). Current Firebase design and explicit limits are in [docs/superpowers/specs/2026-11-15-firebase-phase-1-to-10-design.md](docs/superpowers/specs/2026-11-15-firebase-phase-1-to-10-design.md).
+
+Phase 2 requirements: [docs/product/phase-2-product-and-safety-requirements.md](docs/product/phase-2-product-and-safety-requirements.md).
+
+Phase 3 architecture and threat model: [docs/architecture/phase-3-system-architecture-and-threat-model.md](docs/architecture/phase-3-system-architecture-and-threat-model.md).
+
+## GitHub Pages
+
+The repository's GitHub Actions workflow builds the frontend and publishes it when a change is pushed to `main`. This implementation did not push or deploy. Review the source and workflow before publishing. Firebase client configuration is optional; blank GitHub Variables produce the browser-local build.

@@ -1,13 +1,13 @@
 # OBSCURA Phase 2 — Product and Safety Requirements
 
-**Status:** Complete working draft · approval pending · **Date:** 2026-11-14
+**Status:** Approved baseline for the synthetic Firebase pilot; real-data policy remains pending · **Date:** 2026-11-15
 **Scope:** Define the first usable defensive investigation product before connecting analysis services.
 
 ## 1. Product intent
 
 OBSCURA helps security analysts collect, preserve, compare, and explain digital threat indicators in one investigation workspace. It presents traceable evidence and specialist signals so a human reviewer can make the decision. It does not claim that a single signal proves malicious intent or media fabrication.
 
-The current GitHub Pages release is a static Phase 1 preview. It has no authentication, API, persistence, file upload, or live analysis. The requirements below describe a future service; they do not imply those capabilities are already available.
+The repository now contains an optional Firebase-backed synthetic pilot implementation. No Firebase project is connected, the GitHub Pages build has not been updated, and no cloud service or live analysis has been provisioned. Firebase authentication and Firestore workflows become active only after owner-controlled project setup and rules deployment. The browser-local demo remains isolated and does not migrate its data.
 
 ## 2. Users and responsibilities
 
@@ -168,7 +168,7 @@ The following defaults make the product scope concrete while keeping higher-risk
 
 - **In scope:** a defensive investigation workspace that organizes supplied indicators and permitted evidence, records per-check findings with provenance, and supports human review and report drafting.
 - **Out of scope:** automatic blocking or takedowns; arbitrary browsing of suspicious URLs; attachment execution; face or biometric identification; a claim that a score proves maliciousness; collection or training on customer evidence by default; and live data ingestion before governance approval.
-- **First useful milestone:** rule-based GHOST and MIRAGE checks on authorized, inert representative inputs, saved as traceable results in a case. PHANTOM and QUANTUM can remain later additions.
+- **First useful milestone:** rule-based GHOST and MIRAGE plus text-only PHANTOM and educational QUANTUM checks on synthetic inputs, saved as bounded results in a case. External source lookups remain disabled.
 - **Data gate:** until hosting, retention, evidence policy, access control and recovery are approved and implemented, use synthetic/demo data only. Do not accept real user evidence or credentials.
 
 ## 12. Phase 2 completion criteria
@@ -178,7 +178,7 @@ The following defaults make the product scope concrete while keeping higher-risk
 - MVP inputs, source approval gates, data handling, retention, deletion, incident handling, and recovery dependencies are documented.
 - Finding states, score/confidence wording, provenance, conflict, and uncertainty requirements are defined.
 - Each decision that is not yet safe to finalize has a recommended default and an explicit no-live-data gate.
-- **Approval state:** this is a complete working requirements draft, not stakeholder sign-off. Phase 2 is ready for review; any requested changes should be recorded before Phase 3 architecture is treated as approved.
+- **Approval state:** this requirements baseline is approved for the Firebase synthetic pilot. This does not approve real case data, live connectors, paid APIs, Storage, Cloud Functions, or public deployment of Firebase configuration.
 
 ## References
 
