@@ -24,9 +24,12 @@ if (existsSync(cacheRoot)) {
 }
 
 const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm'
+// The Firebase CLI passes this value to a shell on Linux; literal quote
+// characters become part of the command name and cause a CI exit 127.
+const emulatorTestCommand = process.platform === 'win32' ? '"npm test -- tests/firebase"' : 'npm test -- tests/firebase'
 const command = firebaseEntry
   ? { executable: process.execPath, args: [firebaseEntry, 'emulators:exec', '--project', 'demo-obscura', '--only', 'auth,firestore', 'npm test -- tests/firebase'], shell: false }
-  : { executable: npmCommand, args: ['exec', '--yes', '--legacy-peer-deps', '--cache', '.npm-cache', '--package=firebase-tools@15.36.0', '--', 'firebase', 'emulators:exec', '--project', 'demo-obscura', '--only', 'auth,firestore', '"npm test -- tests/firebase"'], shell: process.platform === 'win32' }
+  : { executable: npmCommand, args: ['exec', '--yes', '--legacy-peer-deps', '--cache', '.npm-cache', '--package=firebase-tools@15.36.0', '--', 'firebase', 'emulators:exec', '--project', 'demo-obscura', '--only', 'auth,firestore', emulatorTestCommand], shell: process.platform === 'win32' }
 
 const child = spawn(command.executable, command.args, { env, stdio: 'inherit', shell: command.shell })
 child.on('error', error => {
